@@ -10,7 +10,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Web.Helpers;
+using Ionic.Zip;
+using System.Web;
+using System.IO.Compression;
+using ZipFile = Ionic.Zip.ZipFile;
 
 namespace Banpro.Pages.ChequesMayores
 {
@@ -19,77 +22,53 @@ namespace Banpro.Pages.ChequesMayores
 
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly string _fecha = DateTime.Now.ToString("ddMMyyyy");
+        private readonly string _pathUploads = DateTime.Now.ToString("ddMMyyyy");
+        private readonly string _pathDestinoServer;
+        private readonly string _pathChequesServidor;
+        private readonly string _pathDestinoServerFinal;
+        private readonly string _nombreArchivo;
+
 
         public IndexModel(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             _configuration = configuration;
             _webHostEnvironment = webHostEnvironment;
+            _pathUploads = ("\\Uploads");
+            _pathDestinoServer = ("/Uploads" + @"/Cheques_Mayores_" + _fecha);
+            _pathChequesServidor = "Cheques_Mayores_" + _fecha;
+            _pathDestinoServerFinal = ("/Uploads" + @"/Cheques_Mayores_" + _fecha + @"/");
+            _nombreArchivo = @"\Cheques_Mayores_" + _fecha + ".zip";
         }
 
-        public IActionResult OnGet()
+        public void OnGet()
         {
-
             try
             {
-                string Fecha = DateTime.Now.ToString("ddMMyyyy");
-                string PathUploads = ("\\Uploads");
-                string PathDestinoServer = ("/Uploads" + @"/vmCheques_Mayores_" + Fecha);
-                string PathChequesServidor = "vmCheques_Mayores_" + Fecha;
-                string PathDestinoServerFinal = ("/Uploads" + @"/vmCheques_Mayores_" + Fecha + @"/");
-                string NombreArchivo = @"\vmCheques_Mayores_" + Fecha + ".zip";
-                string NombreArchivoDelete = "vmCheques_Mayores_" + Fecha + ".zip";
-                string RutaArchivoInicial = PathDestinoServer + NombreArchivo;
-                string RutaCompartida = _configuration.GetValue<string>("RutaCompartida");
-                DirectoryInfo PathServidor = new DirectoryInfo(RutaCompartida);
-                DirectoryInfo PathAppUploads = new DirectoryInfo(_webHostEnvironment.ContentRootPath + PathUploads);
+                DirectoryInfo PathUploads = new DirectoryInfo(_webHostEnvironment.ContentRootPath + _pathUploads);
+                DirectoryInfo PathImagesUploads = new DirectoryInfo(_webHostEnvironment.ContentRootPath + _pathDestinoServerFinal);
 
-
-                if (Directory.Exists(RutaCompartida))
+                if (Directory.Exists(_webHostEnvironment.ContentRootPath + _pathUploads))
                 {
 
-                    foreach (FileInfo fi in PathServidor.GetFiles())
+                    foreach (FileInfo fi in PathImagesUploads.GetFiles())
                     {
                         fi.Delete();
                     }
 
-                    foreach (DirectoryInfo di in PathServidor.GetDirectories())
+                    foreach (DirectoryInfo di in PathUploads.GetDirectories())
                     {
-                        foreach (FileInfo f in di.GetFiles().Where(x => x.Name != NombreArchivoDelete))
-                        {
-                            f.Delete();
-                        }
                         di.Delete();
                     }
-                }
 
-                if (Directory.Exists(_webHostEnvironment.ContentRootPath + PathUploads))
-                {
-                    foreach (FileInfo fiu in PathAppUploads.GetFiles())
-                    {
-                        fiu.Delete();
-                    }
-
-                    foreach (DirectoryInfo diu in PathAppUploads.GetDirectories())
-                    {
-                        foreach (FileInfo fiu in diu.GetFiles().Where(x => x.Name != NombreArchivoDelete))
-                        {
-                            fiu.Delete();
-                        }
-
-                    }
-
-                    foreach (DirectoryInfo diu2 in PathAppUploads.GetDirectories().Where(x => x.Name != PathChequesServidor))
-                    {
-                        diu2.Delete();
-                    }
                 }
             }
             catch (Exception ex)
             {
-                ViewData["Error"] = ("Ocurrio un error al preparar la aplicación, Error: " + ex.Message);               
-
+                ViewData["Error"] = ("Ocurrio un error al preparar la aplicación, Error: " + ex.Message);
             }
-            return Page();
+            VMCheques = new VMCheques();
+
         }
 
         [BindProperty]
@@ -97,6 +76,10 @@ namespace Banpro.Pages.ChequesMayores
 
         public IActionResult OnPost(VMCheques vmCheques)
         {
+            List<ImagenCheque> ListaCheques = new List<ImagenCheque>();
+            DirectoryInfo PathImagenes = new DirectoryInfo(_configuration.GetValue<string>("RutaImagenes"));
+            List<FileInfo> Archivos = new List<FileInfo>();
+
             try
             {
                 if (!vmCheques.FormFiles.Any())
@@ -105,24 +88,10 @@ namespace Banpro.Pages.ChequesMayores
                     return Page();
                 }
 
-                List<ImagenCheque> ListImagenes = new List<ImagenCheque>();
-
                 foreach (IFormFile item in vmCheques.FormFiles)
                 {
                     if (item != null)
                     {
-
-                        string Fecha = DateTime.Now.ToString("ddMMyyyy");
-                        string PathDestinoServer = ("/Uploads" + @"/vmCheques_Mayores_" + Fecha);
-                        string PathChequesServidor = "vmCheques_Mayores_" + Fecha;
-                        string PathDestinoServerFinal = ("/Uploads" + @"/vmCheques_Mayores_" + Fecha + @"/");
-                        string NombreArchivo = @"\vmCheques_Mayores_" + Fecha + ".zip";
-                        string RutaArchivoInicial = PathDestinoServer + NombreArchivo;
-                        string RutaCompartida = _configuration.GetValue<string>("RutaCompartida");
-                        string RutaFisica = _configuration.GetValue<string>("RutaFisica");
-                        string RutaArchivoFinal = RutaFisica + NombreArchivo;
-                        string RutaCompartidaFinal = RutaCompartida + NombreArchivo;
-
                         using (StreamReader Lector = new StreamReader(item.OpenReadStream()))
                         {
                             while (Lector.Peek() > -1)
@@ -149,7 +118,7 @@ namespace Banpro.Pages.ChequesMayores
                                         decimal CkFrenteMonto = decimal.Parse(MontoFinal);
                                         string CkFrenteMoneda = CkFrenteCompleto.Substring(47, 1);
 
-                                        ImagenCheque ImagenUnica = new ImagenCheque()
+                                        ImagenCheque Cheque = new ImagenCheque()
                                         {
                                             NombreFrenteCompleto = CkFrenteCompleto,
                                             NombreFrente = CkFrente,
@@ -161,27 +130,27 @@ namespace Banpro.Pages.ChequesMayores
                                             Moneda = CkFrenteMoneda
                                         };
 
-                                        if (ImagenUnica != null && (!String.IsNullOrEmpty(ImagenUnica.NombreFrente)) &&
-                                                                   (!String.IsNullOrEmpty(ImagenUnica.NombreReverso)) &&
-                                                                   (!String.IsNullOrEmpty(ImagenUnica.Ruta)) &&
-                                                                   (!String.IsNullOrEmpty(ImagenUnica.Cuenta)) &&
-                                                                   (!String.IsNullOrEmpty(ImagenUnica.NumCheque)) &&
-                                                                   (!String.IsNullOrEmpty(ImagenUnica.Moneda)))
+                                        if (Cheque != null && (!String.IsNullOrEmpty(Cheque.NombreFrente)) &&
+                                                                   (!String.IsNullOrEmpty(Cheque.NombreReverso)) &&
+                                                                   (!String.IsNullOrEmpty(Cheque.Ruta)) &&
+                                                                   (!String.IsNullOrEmpty(Cheque.Cuenta)) &&
+                                                                   (!String.IsNullOrEmpty(Cheque.NumCheque)) &&
+                                                                   (!String.IsNullOrEmpty(Cheque.Moneda)))
                                         {
 
-                                            bool ImagenExiste = ListImagenes.Any(x => x.NombreFrenteCompleto == ImagenUnica.NombreFrenteCompleto);
+                                            bool ChequeExiste = ListaCheques.Any(x => x.NombreFrenteCompleto == Cheque.NombreFrenteCompleto);
 
-                                            if (!ImagenExiste)
+                                            if (!ChequeExiste)
                                             {
 
-                                                if (ImagenUnica.Moneda.Equals("1") && ImagenUnica.Monto >= Int32.Parse(_configuration["rangoNIO"]))
+                                                if (Cheque.Moneda.Equals("1") && Cheque.Monto >= Int32.Parse(_configuration["rangoNIO"]))
                                                 {
-                                                    ListImagenes.Add(ImagenUnica);
+                                                    ListaCheques.Add(Cheque);
                                                 }
 
-                                                if (ImagenUnica.Moneda.Equals("2") && ImagenUnica.Monto >= Int32.Parse(_configuration["rangoUSD"]))
+                                                if (Cheque.Moneda.Equals("2") && Cheque.Monto >= Int32.Parse(_configuration["rangoUSD"]))
                                                 {
-                                                    ListImagenes.Add(ImagenUnica);
+                                                    ListaCheques.Add(Cheque);
                                                 }
                                             }
                                         }
@@ -190,19 +159,137 @@ namespace Banpro.Pages.ChequesMayores
                             }
                         }
                     }
-
-
-
                 }
+
+                VMCheques.Imagenes = ListaCheques;
+
+                if (!ListaCheques.Any())
+                {
+                    ViewData["Error"] = ("No existen cheques mayores en los archivos procesados");
+                    return Page();
+                }
+
+                foreach (DirectoryInfo di in PathImagenes.GetDirectories())
+                {
+                    foreach (FileInfo f in di.GetFiles())
+                    {
+                        Archivos.Add(f);
+                    }
+                }
+
+                if (!Archivos.Any())
+                {
+                    foreach (FileInfo f in PathImagenes.GetFiles())
+                    {
+                        Archivos.Add(f);
+                    }
+                }
+
+                if (!Archivos.Any())
+                {
+                    ViewData["Error"] = ("Los archivos fueron procesados exitosamente, pero no se encontraron las imagenes de los cheques en la carpeta correspondiente");
+                    return Page();
+                }
+
+                if (!(Directory.Exists(_webHostEnvironment.ContentRootPath + _pathUploads)))
+                {
+                    Directory.CreateDirectory(_webHostEnvironment.ContentRootPath + _pathUploads);
+                }
+
+                if (!(Directory.Exists(_webHostEnvironment.ContentRootPath + _pathDestinoServer)))
+                {
+                    Directory.CreateDirectory(_webHostEnvironment.ContentRootPath + _pathDestinoServer);
+                }
+
+                List<string> ListaImagenes = new List<string>();
+
+                foreach (ImagenCheque imagen in ListaCheques)
+                {
+                    if (!String.IsNullOrEmpty(imagen.NombreFrente))
+                    {
+                        ListaImagenes.Add(imagen.NombreFrente);
+                    }
+
+                    if (!String.IsNullOrEmpty(imagen.NombreReverso))
+                    {
+                        ListaImagenes.Add(imagen.NombreReverso);
+                    }
+                }
+
+                if (ListaImagenes.Any())
+                    CopyImages(ListaImagenes, Archivos, _pathDestinoServerFinal);
             }
             catch (Exception ex)
             {
                 ViewData["Error"] = ("Ocurrio un error al procesar los archivos, Error: " + ex.Message);
             }
+            return Page();
+        }
 
-            return RedirectToPage("./Index");
+        private void CopyImages(List<string> listaImagenesCopy, List<FileInfo> archivos, string pathDestinoServerFinal)
+        {
+            foreach (FileInfo f in archivos)
+            {
+                if (f != null)
+                {
+
+                    string Imagen = listaImagenesCopy.Find(x => x == f.Name);
+
+                    if (Imagen != null)
+                    {
+
+                        if (!(System.IO.File.Exists(_webHostEnvironment.ContentRootPath + pathDestinoServerFinal + f.Name)))
+                        {
+
+                            if (System.IO.File.Exists(Path.Combine(f.DirectoryName + @"\", f.Name)))
+                            {
+                                System.IO.File.Copy(Path.Combine(f.DirectoryName + @"\", f.Name), _webHostEnvironment.ContentRootPath + pathDestinoServerFinal + f.Name, true);
+                            }
+                        }
+                    }
+                }
+
+            }
+            ViewData["SuccessMessage"] = "La carpeta que contiene el consolidado de Cheques Mayores fue generada exitosamente";
+            ViewData["DownloadFile"] = true;
+
+        }
+
+        public async Task<IActionResult> OnGetFile(VMCheques vmCheques)
+        {
+            try
+            {
+                var botsFolderPath = _webHostEnvironment.ContentRootPath + _pathDestinoServer;
+                var botFilePaths = Directory.GetFiles(botsFolderPath);
+                var zipFileMemoryStream = new MemoryStream();
+                using (ZipArchive archive = new ZipArchive(zipFileMemoryStream, ZipArchiveMode.Update, leaveOpen: true))
+                {
+                    foreach (var botFilePath in botFilePaths)
+                    {
+                        var botFileName = Path.GetFileName(botFilePath);
+                        var entry = archive.CreateEntry(botFileName);
+                        using (var entryStream = entry.Open())
+                        using (var fileStream = System.IO.File.OpenRead(botFilePath))
+                        {
+                            await fileStream.CopyToAsync(entryStream);
+                        }
+                    }
+                }
+
+                zipFileMemoryStream.Seek(0, SeekOrigin.Begin);
+                return File(zipFileMemoryStream, "application/octet-stream", _nombreArchivo);
+
+            }
+            catch (Exception ex)
+            {
+                ViewData["Error"] = "Ha ocurrido un error al descargar el archivo Error: " + ex.Message;
+                VMCheques = vmCheques;
+                return Page();
+            }
         }
     }
+
+
 
 
 }

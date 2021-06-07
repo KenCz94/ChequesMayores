@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Generar cheques mayores";
 }
+<link rel="stylesheet" type="text/css" href="~/css/cheques-mayores.css">
 
 <div class="card" style="min-height:70vh">
     <div class="card-body">
@@ -11,11 +12,69 @@
             <div class="card-body">
                 <form enctype="multipart/form-data" method="post">
                     <div class="file-loading">
-                        <input id="file-es" asp-for="VMCheques.FormFiles" type="file" multiple>
+                        <input id="file-es" accept="text/plain" asp-for="VMCheques.FormFiles" type="file" multiple>
                     </div>
                 </form>
             </div>
         </div>
+        @if (Model.VMCheques.Imagenes != null && Model.VMCheques.Imagenes.Any())
+        {
+            <div class="card">
+                <div class="card-body">
+                    <table class="table" id="table-cheques-mayores">
+                        <thead>
+                            <tr>
+                                <th>
+                                    @Html.DisplayName("Nombre frente")
+                                </th>
+                                <th>
+                                    @Html.DisplayName("Nombre reverso")
+                                </th>
+                                <th>
+                                    @Html.DisplayName("Monto")
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.VMCheques.Imagenes)
+                            {
+                                <tr>
+                                    <td>
+                                        @Html.DisplayFor(modelItem => item.NombreFrente)
+                                    </td>
+                                    <td>
+                                        @Html.DisplayFor(modelItem => item.NombreReverso)
+                                    </td>
+                                    @if (item.Moneda.Equals("1"))
+                                    {
+                                        <td>C$ @Convert.ToDecimal(item.Monto).ToString("N2")</td>
+                                    }
+                                    @if (item.Moneda.Equals("2"))
+                                    {
+                                        <td class="text-right">$ @Convert.ToDecimal(item.Monto).ToString("N2")</td>
+                                    }
+
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @{
+                        if (ViewBag.DownloadFile == true)
+                        {
+                            <div style="margin-top: 5em;" class="text-center col-md-4 col-sm-6 offset-4">
+                                <a class="dedcription-btn" asp-page-handler="File">
+                                    <span class="name-descripeion">Descargar</span>
+                                    <div class="btn-icon download">
+                                        <i class="fa fa-download"></i>
+                                    </div>
+                                </a>
+                            </div>
+
+                        }
+                    }
+                </div>
+            </div>
+        }
     </div>
 </div>
 
@@ -23,17 +82,23 @@
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
 
-<script type="text/javascript">
-    $(document).ready(function () {
-        $('#file-es').fileinput({
-            theme: 'fas',
-            language: 'es',
-            allowedFileExtensions: ['txt'],
-            dropZoneEnabled: false,
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#file-es').fileinput({
+                theme: 'fas',
+                language: 'es',
+                allowedFileExtensions: ['txt'],
+                dropZoneEnabled: false,
 
+            });
+
+            $('#table-cheques-mayores').DataTable({
+                language: {
+                    url: '/lib/datatables/language_es.json'
+                }
+            });
         });
-    });
-</script>
+    </script>
 
 }
 
