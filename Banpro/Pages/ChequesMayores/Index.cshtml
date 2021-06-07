@@ -1,0 +1,39 @@
+﻿@page
+@model Banpro.Pages.ChequesMayores.IndexModel
+
+@{
+    ViewData["Title"] = "Generar cheques mayores";
+}
+
+<div class="card" style="min-height:70vh">
+    <div class="card-body">
+        <div class="card">
+            <div class="card-body">
+                <form enctype="multipart/form-data" method="post">
+                    <div class="file-loading">
+                        <input id="file-es" asp-for="VMCheques.FormFiles" type="file" multiple>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $('#file-es').fileinput({
+            theme: 'fas',
+            language: 'es',
+            allowedFileExtensions: ['txt'],
+            dropZoneEnabled: false,
+
+        });
+    });
+</script>
+
+}
+
